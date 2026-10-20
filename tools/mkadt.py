@@ -81,7 +81,7 @@ def node(name, props=(), children=()):
 
 
 def build(seed=None, qemu=False, highmem=False, nabu=False):
-    """qemu=True: same tree, but with QEMU virt's GIC addresses and CNTFRQ (tools/qemu-sweet.py).
+    """qemu=True: same tree, but with QEMU virt's GIC addresses and CNTFRQ (tools/qemu-nabu.py).
     nabu=True: Xiaomi Pad 5 (SM8150), 8GB high bank and 1600x2560 cont_splash."""
     if nabu:
         phys_base, mem_size = NABU_PHYS_BASE, NABU_MEM_SIZE
