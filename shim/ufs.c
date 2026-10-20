@@ -13,6 +13,17 @@
 #include "console.h"
 #include "ufs.h"
 
+/* clang lowers __builtin_strcmp to a libc call; the shim is -nostdlib. */
+int
+strcmp(const char *a, const char *b)
+{
+	while (*a && *a == *b) {
+		a++;
+		b++;
+	}
+	return (unsigned char)*a - (unsigned char)*b;
+}
+
 #define UFS_BASE	0x01d84000UL	/* ufshc@1d84000, sweet live FDT */
 
 #define REG_CAP		0x00
