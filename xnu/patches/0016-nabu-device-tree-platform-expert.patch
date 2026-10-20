@@ -5,11 +5,11 @@ diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
  
  const char * gIOKernelConfigTables =
      "("
-+#if defined(ARM64_BOARD_CONFIG_SWEET)
++#if defined(ARM64_BOARD_CONFIG_NABU)
 +    "   {"
-+    "     'IOClass'         = SweetPlatformExpert;"
++    "     'IOClass'         = NabuPlatformExpert;"
 +    "     'IOProviderClass' = IOPlatformExpertDevice;"
-+    "     'IONameMatch'     = 'xiaomi,sweet';"
++    "     'IONameMatch'     = 'xiaomi,nabu';"
 +    "     'IOProbeScore'    = 10000:32;"
 +    "   },"
 +#endif
@@ -24,27 +24,27 @@ diff --git a/iokit/conf/files.arm64 b/iokit/conf/files.arm64
  # SMP
  iokit/Kernel/arm/AppleARMSMP.cpp    					optional iokitcpp
 +
-+# SWEET device-tree platform (empty translation unit on other boards)
-+iokit/Kernel/arm/SweetPlatformExpert.cpp                         optional iokitcpp
-diff --git a/iokit/Kernel/arm/SweetPlatformExpert.cpp b/iokit/Kernel/arm/SweetPlatformExpert.cpp
++# NABU device-tree platform (empty translation unit on other boards)
++iokit/Kernel/arm/NabuPlatformExpert.cpp                         optional iokitcpp
+diff --git a/iokit/Kernel/arm/NabuPlatformExpert.cpp b/iokit/Kernel/arm/NabuPlatformExpert.cpp
 new file mode 100644
 --- /dev/null
-+++ b/iokit/Kernel/arm/SweetPlatformExpert.cpp
++++ b/iokit/Kernel/arm/NabuPlatformExpert.cpp
 @@ -0,0 +1,86 @@
 +/*
-+ * Minimal device-tree platform expert for Redmi Note 10 Pro (sweet).
++ * Minimal device-tree platform expert for Redmi Note 10 Pro (nabu).
 + * Uses XNU's normal platform, power-domain and nub initialization. Hardware
 + * interrupt and power-management services are supplied by separate drivers.
 + */
 +#include <pexpert/arm64/board_config.h>
 +
-+#if defined(SWEET)
++#if defined(NABU)
 +#include <IOKit/IOPlatformExpert.h>
 +#include <IOKit/IODeviceTreeSupport.h>
 +#include <IOKit/IOLib.h>
 +
-+class SweetPlatformExpert : public IODTPlatformExpert {
-+	OSDeclareDefaultStructors(SweetPlatformExpert);
++class NabuPlatformExpert : public IODTPlatformExpert {
++	OSDeclareDefaultStructors(NabuPlatformExpert);
 +
 +public:
 +	bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
@@ -55,38 +55,38 @@ new file mode 100644
 +	bool getProductName(char *name, int maxLength) APPLE_KEXT_OVERRIDE;
 +};
 +
-+OSDefineMetaClassAndStructors(SweetPlatformExpert, IODTPlatformExpert);
++OSDefineMetaClassAndStructors(NabuPlatformExpert, IODTPlatformExpert);
 +
 +bool
-+SweetPlatformExpert::start(IOService *provider)
++NabuPlatformExpert::start(IOService *provider)
 +{
-+	IOLog("SWEET: starting device-tree platform expert\n");
++	IOLog("NABU: starting device-tree platform expert\n");
 +	if (!IODTPlatformExpert::start(provider)) {
 +		return false;
 +	}
 +	registerService();
-+	IOLog("SWEET: platform expert registered\n");
++	IOLog("NABU: platform expert registered\n");
 +	return true;
 +}
 +
 +const char *
-+SweetPlatformExpert::deleteList(void)
++NabuPlatformExpert::deleteList(void)
 +{
 +	return "()";
 +}
 +
 +const char *
-+SweetPlatformExpert::excludeList(void)
++NabuPlatformExpert::excludeList(void)
 +{
 +	return "('chosen', 'defaults', 'cpus', 'options')";
 +}
 +
 +void
-+SweetPlatformExpert::processTopLevel(IORegistryEntry *root)
++NabuPlatformExpert::processTopLevel(IORegistryEntry *root)
 +{
 +	/*
 +	 * The stock implementation requires an Apple NVRAM /options node.
-+	 * SWEET has no NVRAM controller; publish real CPU/device nodes without
++	 * NABU has no NVRAM controller; publish real CPU/device nodes without
 +	 * inventing one. createNubs adds the topology's logical CPU/cluster IDs.
 +	 */
 +	IORegistryEntry *cpus = root->childFromPath("cpus", gIODTPlane);
@@ -98,17 +98,17 @@ new file mode 100644
 +}
 +
 +bool
-+SweetPlatformExpert::getTargetName(char *name, int maxLength)
++NabuPlatformExpert::getTargetName(char *name, int maxLength)
 +{
 +	if (name == NULL || maxLength <= 0) {
 +		return false;
 +	}
-+	strlcpy(name, "sweet", (size_t)maxLength);
++	strlcpy(name, "nabu", (size_t)maxLength);
 +	return true;
 +}
 +
 +bool
-+SweetPlatformExpert::getProductName(char *name, int maxLength)
++NabuPlatformExpert::getProductName(char *name, int maxLength)
 +{
 +	if (name == NULL || maxLength <= 0) {
 +		return false;
@@ -116,4 +116,4 @@ new file mode 100644
 +	strlcpy(name, "Redmi Note 10 Pro", (size_t)maxLength);
 +	return true;
 +}
-+#endif /* SWEET */
++#endif /* NABU */

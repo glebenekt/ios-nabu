@@ -1,5 +1,5 @@
 #!/bin/sh
-# Host side of the phone's USB Ethernet (kernel sweetusb=2, patches 0075-0077).
+# Host side of the phone's USB Ethernet (kernel nabuusb=2, patches 0075-0077).
 #   tools/nabu-usbnet.sh [LOGFILE]
 # Waits for the phone's CDC-ECM interface (host MAC 02:00:5e:77:ee:01),
 # gives it 192.168.7.1/24 (the phone is 192.168.7.2), then prints the live

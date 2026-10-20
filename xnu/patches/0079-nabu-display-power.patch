@@ -1,5 +1,5 @@
---- a/iokit/Kernel/arm/SweetFramebuffer.cpp
-+++ b/iokit/Kernel/arm/SweetFramebuffer.cpp
+--- a/iokit/Kernel/arm/NabuFramebuffer.cpp
++++ b/iokit/Kernel/arm/NabuFramebuffer.cpp
 @@ -15,7 +15,12 @@
   *   5  SwapEnd, struct 0x46c: +0x50 swap id, +0x54 IOSurface id per layer
   *      (4 layers), +0x64 rect a / +0xc4 rect b per layer (int x,y,w,h),
@@ -15,15 +15,15 @@
   * Everything else is accepted and logged once.
   *
 @@ -53,6 +58,7 @@
- 	kSweetFBSwapWait                = 6,
- 	kSweetFBGetID                   = 7,
- 	kSweetFBGetDisplaySize          = 8,
-+	kSweetFBRequestPowerChange      = 12,
- 	kSweetFBIsMainDisplay           = 18,
- 	kSweetFBGetDotPitch             = 28,
- 	kSweetFBNotifications           = 72,
+ 	kNabuFBSwapWait                = 6,
+ 	kNabuFBGetID                   = 7,
+ 	kNabuFBGetDisplaySize          = 8,
++	kNabuFBRequestPowerChange      = 12,
+ 	kNabuFBIsMainDisplay           = 18,
+ 	kNabuFBGetDotPitch             = 28,
+ 	kNabuFBNotifications           = 72,
 @@ -108,6 +114,8 @@
- 	uint8_t       fPending[SWEET_FB_SWAP_REC_SIZE];     /* latest swap, not yet shown */
+ 	uint8_t       fPending[NABU_FB_SWAP_REC_SIZE];     /* latest swap, not yet shown */
  	bool          fDirty;
  	uint32_t      fFlushTicks;    /* vsync ticks between panel copies */
 +	bool          fPowerOff;      /* RequestPowerChange(0) */
@@ -33,7 +33,7 @@
  	void addClient(IOMobileFramebufferUserClient *client);
 @@ -216,6 +224,24 @@
  		    (IOMobileFramebufferUserClient *)fb->fClients->getObject(i);
- 		client->notify(SWEET_FB_NOTIFY_VSYNC, values, 6);
+ 		client->notify(NABU_FB_NOTIFY_VSYNC, values, 6);
  	}
 +	if (fb->fPowerOff) {
 +		/* Fade out: halve every channel each vsync, then black, then idle. */
@@ -50,7 +50,7 @@
 +				}
 +			}
 +		}
-+		sender->setTimeoutUS(SWEET_FB_VSYNC_US);
++		sender->setTimeoutUS(NABU_FB_VSYNC_US);
 +		return;
 +	}
  	bool flush = fb->fDirty && (count % fb->fFlushTicks) == 0;
@@ -60,7 +60,7 @@
  			    args->scalarInput[0] ? "on" : "off");
  		}
  		break;
-+	case kSweetFBRequestPowerChange:
++	case kNabuFBRequestPowerChange:
 +		if (args->scalarInputCount >= 1) {
 +			bool off = args->scalarInput[0] == 0;
 +			IOLockLock(fFB->fLock);
@@ -70,9 +70,9 @@
 +				fFB->fDirty = true;     /* on: redraw the latest frame */
 +			}
 +			IOLockUnlock(fFB->fLock);
-+			IOLog("SWEET FB: display %s\n", off ? "off" : "on");
++			IOLog("NABU FB: display %s\n", off ? "off" : "on");
 +		}
 +		break;
- 	case kSweetFBSwapWait:
+ 	case kNabuFBSwapWait:
  	default:
  		break;

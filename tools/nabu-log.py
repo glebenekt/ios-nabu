@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Decode the SWEET persistent console log (kernel patch 0047).
+"""Decode the NABU persistent console log (kernel patch 0047).
 
   nabu-log.py AREA.bin [OUT.txt]
 
 AREA.bin is the last (1 + ring/4096) device blocks of the userdata
 partition as read by tools/nabu-log-pull.sh: block 0 is the header
-("SWEETLOG", u32 version, u32 ring size, u64 total bytes, u64 flush seq),
+("NABULOG", u32 version, u32 ring size, u64 total bytes, u64 flush seq),
 the ring follows. Byte n of the console stream is at ring offset n % size.
 """
 import struct, sys
 
 data = open(sys.argv[1], 'rb').read()
 magic, version, size, total, seq = struct.unpack_from('<8sIIQQ', data, 0)
-if magic != b'SWEETLOG':
-    sys.exit('no SWEETLOG header (log never flushed, or wrong area)')
+if magic != b'NABULOG':
+    sys.exit('no NABULOG header (log never flushed, or wrong area)')
 ring = data[4096:4096 + size]
 if total <= size:
     text = ring[:total]

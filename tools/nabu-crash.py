@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Symbolicate SWEET console crash reports (patch 0043) typed in from a photo.
+"""Symbolicate NABU console crash reports (patch 0043) typed in from a photo.
 
   nabu-crash.py CACHE ROOT [REPORT.txt]       (report on stdin if omitted)
 

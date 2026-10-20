@@ -1,10 +1,10 @@
 --- a/iokit/conf/files.arm64
 +++ b/iokit/conf/files.arm64
 @@ -12,3 +12,4 @@
- iokit/Kernel/arm/SweetCPU.cpp                                    optional iokitcpp
- iokit/Kernel/arm/SweetEntitlements.cpp                           optional iokitcpp
- iokit/Kernel/arm/SweetKeyStore.cpp                               optional iokitcpp
-+iokit/Kernel/arm/SweetWatchdog.cpp                               optional iokitcpp
+ iokit/Kernel/arm/NabuCPU.cpp                                    optional iokitcpp
+ iokit/Kernel/arm/NabuEntitlements.cpp                           optional iokitcpp
+ iokit/Kernel/arm/NabuKeyStore.cpp                               optional iokitcpp
++iokit/Kernel/arm/NabuWatchdog.cpp                               optional iokitcpp
 --- a/iokit/KernelConfigTables.cpp
 +++ b/iokit/KernelConfigTables.cpp
 @@ -52,6 +52,11 @@
@@ -20,22 +20,22 @@
      "   {"
      "     'IOClass'         = IOPanicPlatform;"
 --- /dev/null
-+++ b/iokit/Kernel/arm/SweetWatchdog.cpp
++++ b/iokit/Kernel/arm/NabuWatchdog.cpp
 @@ -0,0 +1,94 @@
 +/*
-+ * Built-in IOWatchdog for SWEET.
++ * Built-in IOWatchdog for NABU.
 + *
 + * watchdogd (launchd job with _PanicOnCrash) opens IOServiceMatching(
 + * "IOWatchdog") with type 1 and exits when it is missing, which panics the
 + * system. On Apple hardware the kext arms a SoC watchdog that resets the
-+ * device unless watchdogd keeps checking in. SWEET has no reset path, so
++ * device unless watchdogd keeps checking in. NABU has no reset path, so
 + * this service accepts every call (check-in 1, enable/disable userspace
 + * monitoring 3/4, 0/5, struct calls 2 and 9) and does nothing; each
 + * selector is logged the first time it is used.
 + */
 +#include <pexpert/arm64/board_config.h>
 +
-+#if defined(SWEET)
++#if defined(NABU)
 +#include <IOKit/IOService.h>
 +#include <IOKit/IOUserClient.h>
 +#include <IOKit/IOKitKeys.h>
@@ -60,7 +60,7 @@
 +	}
 +	setProperty(kIOUserClientClassKey, "IOWatchdogUserClient");
 +	registerService();
-+	IOLog("SWEET WDT: IOWatchdog registered (accepts check-ins, never fires)\n");
++	IOLog("NABU WDT: IOWatchdog registered (accepts check-ins, never fires)\n");
 +	return true;
 +}
 +
@@ -83,7 +83,7 @@
 +	return kIOReturnSuccess;
 +}
 +
-+static uint64_t sweet_wdt_logged;       /* selectors already logged (< 64) */
++static uint64_t nabu_wdt_logged;       /* selectors already logged (< 64) */
 +
 +IOReturn
 +IOWatchdogUserClient::externalMethod(uint32_t selector, IOExternalMethodArguments *args,
@@ -103,16 +103,16 @@
 +		bzero(args->structureOutput, args->structureOutputSize);
 +	}
 +
-+	if (selector >= 64 || !(sweet_wdt_logged & (1ULL << selector))) {
++	if (selector >= 64 || !(nabu_wdt_logged & (1ULL << selector))) {
 +		if (selector < 64) {
-+			sweet_wdt_logged |= 1ULL << selector;
++			nabu_wdt_logged |= 1ULL << selector;
 +		}
 +		char name[32];
 +		proc_selfname(name, sizeof(name));
-+		IOLog("SWEET WDT: %s sel %u in %u/%u out %u/%u -> ok\n", name, selector,
++		IOLog("NABU WDT: %s sel %u in %u/%u out %u/%u -> ok\n", name, selector,
 +		    args->scalarInputCount, args->structureInputSize,
 +		    args->scalarOutputCount, args->structureOutputSize);
 +	}
 +	return kIOReturnSuccess;
 +}
-+#endif /* SWEET */
++#endif /* NABU */

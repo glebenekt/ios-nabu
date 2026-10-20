@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build the minimal Apple Device Tree that the SWEET xnu needs to boot.
+"""Build the minimal Apple Device Tree that the NABU xnu needs to boot.
 
 Only what the early boot path actually reads (see NOTES.md); every MMIO
-address comes from the sweet live FDT. Usage:  mkadt.py OUT.adt [--dump] [--qemu] [--highmem]
+address comes from the nabu live FDT. Usage:  mkadt.py OUT.adt [--dump] [--qemu] [--highmem]
 """
 import hashlib, os, struct, sys
 
@@ -23,14 +23,14 @@ SOC_BASE = 0x01000000
 GICD, GICD_SIZE = 0x17a00000, 0x10000
 GICR, GICR_SIZE = 0x17a60000, 0x100000
 FB, FB_SIZE = 0x9c000000, 0x1700000
-SWEET_ECID = 0x5357454554000001  # 'SWEET' + 1, synthetic
+NABU_ECID = 0x5357454554000001  # 'NABU' + 1, synthetic
 FB_W, FB_H, FB_STRIDE = 1080, 2400, 1080 * 4
 # Internal UFS host (ufshc@1d84000 "ufs_mem"); QEMU virt has none
 UFS, UFS_SIZE = 0x01d84000, 0x3000
 
 # NABU (Xiaomi Pad 5, SM8150): the live FDT has a contiguous 8GB bank at
 # 0x1_80000000; use it for the kernel-managed RAM. cont_splash is at the same
-# 0x9c000000 address as sweet, 1600x2560 portrait, 32bpp.
+# 0x9c000000 address as nabu, 1600x2560 portrait, 32bpp.
 NABU_PHYS_BASE = 0x180000000
 NABU_MEM_SIZE = 0x200000000
 NABU_FB = 0x9c000000
@@ -45,7 +45,7 @@ VTIMER_INTID = 19
 QEMU_GICD, QEMU_GICR, QEMU_TIMEBASE = 0x08000000, 0x080a0000, 62500000
 QEMU_VTIMER_INTID = 27
 
-BOOT_MANIFEST_HASH = hashlib.sha384(b'sweet boot manifest').digest()
+BOOT_MANIFEST_HASH = hashlib.sha384(b'nabu boot manifest').digest()
 
 # The iOS userland is the iPhone X (iPhone10,3 / D22AP) IPSW. MobileGestalt
 # derives product type, device class, home-button-less UI, artwork etc. from
@@ -54,11 +54,12 @@ BOOT_MANIFEST_HASH = hashlib.sha384(b'sweet boot manifest').digest()
 #   tools/remotezip.py URL DeviceTree.d22ap.im4p DIR
 #   ipsw img4 im4p extract DIR/Firmware/all_flash/DeviceTree.d22ap.im4p -o d22ap.adt
 D22AP_ADT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../research/ipsw-x/d22ap.adt')
+IPAD73_ADT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../refs/ipad73/j207ap.adt')
 
 
-def d22ap_product(path=D22AP_ADT):
-    """/product properties of the real D22AP tree, without the syscfg
-    placeholders iBoot would fill in (flag bit set) and the node bookkeeping."""
+def adt_product(path):
+    """/product properties of a real Apple device tree, without the syscfg
+    placeholders iBoot would fill in (flag bit set) and node bookkeeping."""
     if not os.path.exists(path):
         print(f'warning: {path} missing, no /product node', file=sys.stderr)
         return None
@@ -67,6 +68,14 @@ def d22ap_product(path=D22AP_ADT):
         if dict((k, v) for k, f, v in c.props).get('name') == b'product\0':
             return [(k, v) for k, f, v in c.props if not f and k not in ('name', 'AAPL,phandle')]
     raise SystemExit(f'{path}: no /product node')
+
+
+def d22ap_product(path=D22AP_ADT):
+    return adt_product(path)
+
+
+def ipad73_product(path=IPAD73_ADT):
+    return adt_product(path)
 
 u32 = lambda *v: struct.pack('<%dI' % len(v), *v)
 u64 = lambda *v: struct.pack('<%dQ' % len(v), *v)
@@ -80,20 +89,41 @@ def node(name, props=(), children=()):
     return n
 
 
-def build(seed=None, qemu=False, highmem=False, nabu=False):
-    """qemu=True: same tree, but with QEMU virt's GIC addresses and CNTFRQ (tools/qemu-nabu.py).
-    nabu=True: Xiaomi Pad 5 (SM8150), 8GB high bank and 1600x2560 cont_splash."""
-    if nabu:
+def build(seed=None, qemu=False, highmem=False, nabu=False, ipad=False):
+    """qemu=True: QEMU virt GIC/CNTFRQ.
+    nabu=True: Xiaomi Pad 5 (SM8150), 8GB high bank, 1600x2560 cont_splash.
+    ipad=True: NABU hardware with iPad7,3 identity and 1668x2224 canvas."""
+    if nabu or ipad:
         phys_base, mem_size = NABU_PHYS_BASE, NABU_MEM_SIZE
         fb, fb_size, fb_w, fb_h, fb_stride = (NABU_FB, NABU_FB_SIZE,
             NABU_FB_W, NABU_FB_H, NABU_FB_STRIDE)
         ufs, ufs_size = NABU_UFS, NABU_UFS_SIZE
         ecid = NABU_ECID
+        if ipad:
+            display_scale = 2
+            canvas_w, canvas_h = 1668, 2224
+            identity_model = 'iPad7,3'
+            target_type, target_sub = 'J207', 'J207AP'
+            product_props = ipad73_product()
+            home_button_type = None
+        else:
+            display_scale = 3
+            canvas_w, canvas_h = 1125, 2436
+            identity_model = 'iPhone10,3'
+            target_type, target_sub = 'D22', 'D22AP'
+            product_props = d22ap_product()
+            home_button_type = 2
     else:
         phys_base, mem_size = (HIGH_PHYS_BASE, HIGH_MEM_SIZE) if highmem else (PHYS_BASE, MEM_SIZE)
         fb, fb_size, fb_w, fb_h, fb_stride = FB, FB_SIZE, FB_W, FB_H, FB_STRIDE
         ufs, ufs_size = UFS, UFS_SIZE
-        ecid = SWEET_ECID
+        ecid = NABU_ECID
+        display_scale = 3
+        canvas_w, canvas_h = 1125, 2436
+        identity_model = 'iPhone10,3'
+        target_type, target_sub = 'D22', 'D22AP'
+        product_props = d22ap_product()
+        home_button_type = 2
     gicd, gicr, timebase = (QEMU_GICD, QEMU_GICR, QEMU_TIMEBASE) if qemu else (GICD, GICR, TIMEBASE)
     seed = seed if seed is not None else os.urandom(64)
     phandle = iter(range(1, 1000))
@@ -105,8 +135,8 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
         ('dram-size', u64(mem_size)),
         ('random-seed', seed),
         ('debug-enabled', u32(1)),
-        ('firmware-version', cstr('nabu-shim' if nabu else 'sweet-shim')),
-        ('system-firmware-version', cstr('nabu-shim' if nabu else 'sweet-shim')),
+        ('firmware-version', cstr('nabu-shim' if (nabu or ipad) else 'nabu-shim')),
+        ('system-firmware-version', cstr('nabu-shim' if (nabu or ipad) else 'nabu-shim')),
         # iBoot's SHA-384 of the boot manifest; /sbin/mount -P 1 exits unless
         # it exists (bind mounts /private/preboot/<hex>/usr/standalone/firmware,
         # tolerating a missing directory). Fixed stand-in value.
@@ -118,13 +148,13 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
         # from /chosen, the pixel size from IOMobileFramebuffer. Scale 0 makes
         # SpringBoard's FBSDisplayMode "infxinf@0x" invalid. 1080x2400 @3x =
         # 360x800 points (like iPhone X class devices).
-        ('display-scale', u32(3)),
+        ('display-scale', u32(display_scale)),
         # XNU derives IOPlatformUUID (gethostuuid) from these on arm; without
         # them CFPreferences cannot use kCFPreferencesCurrentHost (no ByHost
         # files), so e.g. DataMigration never records LastSystemVersion and
         # migrates on every boot. Synthetic ECID (not the phone's); chip-id
         # of the A11 that the iPhone X userland expects.
-        *([] if nabu else [
+        *([] if (nabu or ipad) else [
             ('unique-chip-id', struct.pack('<Q', ecid)),
             ('chip-id', u32(0x8015)),
         ]),
@@ -144,16 +174,16 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
         # with CSR_ALLOW_UNRESTRICTED_FS (vm_unix.c shared region checks).
         node('asmb', [ph(), ('lp-sip0', u64(0x6f)), ('lp-sip1', u32(1))])])
 
-    # SWEET SMP: all eight cores in physical-core order (0-5 Cortex-A55,
+    # NABU SMP: all eight cores in physical-core order (0-5 Cortex-A55,
     # 6-7 Cortex-A76), one homogeneous cluster. The kernel defaults to one
     # and uses cpus=N to select an initial prefix (N <= 8).
-    # QEMU retains its original single-CPU tree: its MPIDRs differ from sweet.
+    # QEMU retains its original single-CPU tree: its MPIDRs differ from nabu.
     cpu_nodes = []
     for core in range(1 if qemu else 8):
         cpu_nodes.append(node(f'cpu{core}', [
             ph(),
             ('device_type', cstr('cpu')),
-            ('compatible', cstr('qcom,kryo485' if nabu else 'qcom,kryo470') + cstr('ARM,v8')),
+            ('compatible', cstr('qcom,kryo485' if (nabu or ipad) else 'qcom,kryo470') + cstr('ARM,v8')),
             ('reg', u32(core << 8)),  # actual MPIDR Aff1:Aff0, NOT logical ID
             ('cpu-id', u32(core)),   # descriptive: XNU assigns IDs by DT order
             ('cluster-id', u32(0)),  # descriptive; see ml_parse_cpu_topology
@@ -183,8 +213,8 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
     ])
     arm_io = node('arm-io', [
         ph(),
-        ('device_type', cstr('sweet-io')),
-        ('compatible', cstr('sweet-io') + cstr('arm-io')),
+        ('device_type', cstr('nabu-io')),
+        ('compatible', cstr('nabu-io') + cstr('arm-io')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
         ('ranges', u64(0, SOC_BASE, 0x100000000 - SOC_BASE)),
@@ -195,17 +225,17 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
         node('wdt', [ph(), ('no-pmu', u32(1))]),
         # Main display: IOMobileFramebuffer.framework counts /arm-io children
         # with this device_type and reads the canvas size from the node
-        # (the presented iPhone X size, see SweetFramebuffer.cpp);
+        # (the presented iPhone X size, see NabuFramebuffer.cpp);
         # the kernel's AppleCLCD matches the compatible string.
         node('disp0', [
             ph(),
             ('device_type', cstr('display-subsystem')),
-            ('compatible', cstr('sweet,display')),
-            ('canvas-width', u32(1125)),
-            ('canvas-height', u32(2436)),
+            ('compatible', cstr('nabu,display')),
+            ('canvas-width', u32(canvas_w)),
+            ('canvas-height', u32(canvas_h)),
         ])])
 
-    fbcon = node('sweet-fbcon', [
+    fbcon = node('nabu-fbcon', [
         ph(),
         ('reg', u64(fb, fb_size)),
         ('width', u32(fb_w)),
@@ -213,8 +243,8 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
         ('stride', u32(fb_stride)),
     ])
 
-    # bsd/dev/sweet_ufs.c: the UFS host ABL leaves running (absolute physical reg).
-    ufs = node('sweet-ufs', [
+    # bsd/dev/nabu_ufs.c: the UFS host ABL leaves running (absolute physical reg).
+    ufs = node('nabu-ufs', [
         ph(),
         ('compatible', cstr('qcom,ufshc')),
         ('reg', u64(ufs, ufs_size)),
@@ -228,27 +258,33 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
 
     # MobileGestalt HomeButtonType = IODeviceTree:/buttons home-button-type
     # (D22AP: 2, no Home button; absent = 0 = Home-button device).
-    buttons = node('buttons', [
+    button_props = [
         ph(),
         ('button-names', cstr('volup') + cstr('voldown') + cstr('hold')),
-        ('home-button-type', u32(2)),
         ('opposed-power-vol-buttons', u32(1)),
-    ])
+    ]
+    if home_button_type is not None:
+        button_props.insert(2, ('home-button-type', u32(home_button_type)))
+    buttons = node('buttons', button_props)
 
-    product_props = d22ap_product()
     product = [node('product', [ph()] + product_props)] if product_props else []
 
-    # Identity of the iPhone X whose userland runs here: compatible[0] is
-    # hw.model/hw.target (D22AP), model is hw.machine/hw.product
-    # (iPhone10,3). 'xiaomi,sweet' stays for SweetPlatformExpert matching.
+    # Identity of the userland that runs here.
+    if ipad:
+        root_compatible = (cstr('J207AP') + cstr('iPad7,3')
+            + cstr('xiaomi,nabu') + cstr('qcom,sm8150') + cstr('AppleARM'))
+    elif nabu:
+        root_compatible = (cstr('D22AP') + cstr('iPhone10,3')
+            + cstr('xiaomi,nabu') + cstr('qcom,sm8150') + cstr('AppleARM'))
+    else:
+        root_compatible = (cstr('D22AP') + cstr('iPhone10,3')
+            + cstr('xiaomi,nabu') + cstr('qcom,sm7150') + cstr('AppleARM'))
     return node('device-tree', [
         ph(),
-        ('compatible', cstr('D22AP') + cstr('iPhone10,3')
-            + (cstr('xiaomi,nabu') + cstr('qcom,sm8150') if nabu
-               else cstr('xiaomi,sweet') + cstr('qcom,sm7150')) + cstr('AppleARM')),
-        ('model', cstr('iPhone10,3')),
-        ('target-type', cstr('D22')),
-        ('target-sub-type', cstr('D22AP')),
+        ('compatible', root_compatible),
+        ('model', cstr(identity_model)),
+        ('target-type', cstr(target_type)),
+        ('target-sub-type', cstr(target_sub)),
         ('manufacturer', cstr('Apple Inc.')),
         ('#address-cells', u32(2)),
         ('#size-cells', u32(2)),
@@ -257,7 +293,7 @@ def build(seed=None, qemu=False, highmem=False, nabu=False):
 
 if __name__ == '__main__':
     root = build(qemu='--qemu' in sys.argv, highmem='--highmem' in sys.argv,
-                 nabu='--nabu' in sys.argv)
+                 nabu='--nabu' in sys.argv, ipad='--ipad' in sys.argv)
     blob = adt.serialize(root)
     open(sys.argv[1], 'wb').write(blob)
     if '--dump' in sys.argv:

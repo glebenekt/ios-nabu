@@ -24,5 +24,5 @@
 +		vm_map_unlock_read(map);
 +	}
  	if (sig == 6 || sig == 5) {
- 		sweet_crash_strings(name);
+ 		nabu_crash_strings(name);
  	}

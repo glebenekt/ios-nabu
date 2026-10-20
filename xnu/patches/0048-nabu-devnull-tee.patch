@@ -4,30 +4,30 @@
  	return 0;
  }
  
-+#if defined(ARM64_BOARD_CONFIG_SWEET)
++#if defined(ARM64_BOARD_CONFIG_NABU)
 +/*
-+ * SWEET: daemons started by launchd write stdout/stderr to /dev/null, and
++ * NABU: daemons started by launchd write stdout/stderr to /dev/null, and
 + * pointing a launchd job at /dev/console stops it from launching at all
 + * (backboardd, v8 image). Instead, what the processes named in boot-arg
-+ * sweetnull (comma separated, default "backboardd,SpringBoard") write to
++ * nabunull (comma separated, default "backboardd,SpringBoard") write to
 + * /dev/null goes to the console (and so to the persistent log) as
-+ * "|name| text". sweetnull=- turns it off.
++ * "|name| text". nabunull=- turns it off.
 + */
-+static char sweet_null_names[128];
-+static int sweet_null_parsed;
++static char nabu_null_names[128];
++static int nabu_null_parsed;
 +
 +static bool
-+sweet_null_tee(char *name, size_t len)
++nabu_null_tee(char *name, size_t len)
 +{
-+	if (!sweet_null_parsed) {
-+		if (!PE_parse_boot_argn("sweetnull", sweet_null_names, sizeof(sweet_null_names))) {
-+			strlcpy(sweet_null_names, "backboardd,SpringBoard", sizeof(sweet_null_names));
++	if (!nabu_null_parsed) {
++		if (!PE_parse_boot_argn("nabunull", nabu_null_names, sizeof(nabu_null_names))) {
++			strlcpy(nabu_null_names, "backboardd,SpringBoard", sizeof(nabu_null_names));
 +		}
-+		sweet_null_parsed = 1;
++		nabu_null_parsed = 1;
 +	}
 +	proc_selfname(name, (int)len);
 +	size_t n = strlen(name);
-+	for (const char *t = sweet_null_names; *t;) {
++	for (const char *t = nabu_null_names; *t;) {
 +		const char *end = strchr(t, ',');
 +		size_t tl = end ? (size_t)(end - t) : strlen(t);
 +		if (tl == n && n > 0 && strncmp(t, name, n) == 0) {
@@ -49,10 +49,10 @@
  			if (rw == UIO_READ) {
  				return 0;
  			}
-+#if defined(ARM64_BOARD_CONFIG_SWEET)
++#if defined(ARM64_BOARD_CONFIG_NABU)
 +			{
 +				char name[32];
-+				if (sweet_null_tee(name, sizeof(name))) {
++				if (nabu_null_tee(name, sizeof(name))) {
 +					char buf[256];
 +					c = MIN(uio_curriovlen(uio), sizeof(buf));
 +					error = uiomove(buf, (int)c, uio);

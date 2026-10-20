@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot a SWEETXNU payload (tools/mkpayload.py) in QEMU's virt board.
+"""Boot a NABUXNU payload (tools/mkpayload.py) in QEMU's virt board.
 
   qemu-nabu.py PAYLOAD OUTDIR [--secs N] [--gdb] [--live-serial]
 
@@ -77,7 +77,7 @@ def check_kernel_tools(kernel_path):
 def build_image(payload):
     """Return (phys_base, ram_image, boot_args_pa, entry_pa)."""
     magic, ver, nsegs = struct.unpack_from('<8sII', payload, 0)
-    assert magic == b'SWEETXNU' and ver == 1, 'not a SWEETXNU v1 payload'
+    assert magic == b'NABUXNU' and ver == 1, 'not a NABUXNU v1 payload'
     virt_base, entry_va, adt_off, adt_size, kernel_end, phys_base, mem_size = \
         struct.unpack_from('<7Q', payload, 0x10)
     cmdline = payload[0x48:0x48 + BOOT_LINE_LENGTH]
@@ -150,7 +150,7 @@ def decode_screen(raw, font):
 
 
 def screen_result(screen, unknown):
-    if 'panic(cpu ' in screen or 'SWEET EARLY PANIC:' in screen:
+    if 'panic(cpu ' in screen or 'NABU EARLY PANIC:' in screen:
         status = 'panic'
     elif unknown:
         status = 'incomplete_decode'
@@ -210,7 +210,7 @@ def stream_serial_file(serial_path, file_pos, out_stream=sys.stdout):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Boot a SWEETXNU payload in QEMU's virt board.",
+        description="Boot a NABUXNU payload in QEMU's virt board.",
         epilog="Examples:\n"
                "  qemu-nabu.py payload.bin out/\n"
                "  qemu-nabu.py payload.bin out/ --live-serial\n"
@@ -218,7 +218,7 @@ def main():
                "  qemu-nabu.py --check-env\n",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument('payload', nargs='?', help='SWEETXNU payload binary (from mkpayload.py)')
+    ap.add_argument('payload', nargs='?', help='NABUXNU payload binary (from mkpayload.py)')
     ap.add_argument('outdir', nargs='?', help='Output directory for fb.png, regs.txt, and logs')
     ap.add_argument('--secs', type=float, default=20, help='Duration to run QEMU in seconds (default: 20)')
     ap.add_argument('--gdb', action='store_true', help='start halted, gdb stub on :1234, no timeout')

@@ -1,12 +1,12 @@
---- a/iokit/Kernel/arm/SweetSurface.cpp
-+++ b/iokit/Kernel/arm/SweetSurface.cpp
+--- a/iokit/Kernel/arm/NabuSurface.cpp
++++ b/iokit/Kernel/arm/NabuSurface.cpp
 @@ -407,7 +407,7 @@
  	OSArray *fRefs;
  
- 	SweetSurfaceRef *findRef(uint32_t id, unsigned int *index);
--	IOReturn addRef(SweetSurface *s, SweetSurfaceRef **refOut);
-+	IOReturn addRef(SweetSurface *s, SweetSurfaceRef **refOut, bool *existing);
- 	IOReturn returnSurface(SweetSurface *s, IOExternalMethodArguments *args);
+ 	NabuSurfaceRef *findRef(uint32_t id, unsigned int *index);
+-	IOReturn addRef(NabuSurface *s, NabuSurfaceRef **refOut);
++	IOReturn addRef(NabuSurface *s, NabuSurfaceRef **refOut, bool *existing);
+ 	IOReturn returnSurface(NabuSurface *s, IOExternalMethodArguments *args);
  	IOReturn create(IOExternalMethodArguments *args);
  
 @@ -495,17 +495,25 @@
@@ -22,25 +22,25 @@
 + * snapshot crash in CGDataProviderCreateWithData).
   */
  IOReturn
--IOSurfaceRootUserClient::addRef(SweetSurface *s, SweetSurfaceRef **refOut)
-+IOSurfaceRootUserClient::addRef(SweetSurface *s, SweetSurfaceRef **refOut, bool *existing)
+-IOSurfaceRootUserClient::addRef(NabuSurface *s, NabuSurfaceRef **refOut)
++IOSurfaceRootUserClient::addRef(NabuSurface *s, NabuSurfaceRef **refOut, bool *existing)
  {
 +	*existing = false;
  	IOLockLock(fLock);
- 	SweetSurfaceRef *ref = findRef(s->id, NULL);
+ 	NabuSurfaceRef *ref = findRef(s->id, NULL);
  	if (ref != NULL && ref->surface == s) {
 -		ref->count++;
  		IOLockUnlock(fLock);
- 		sweet_surface_put(s);
+ 		nabu_surface_put(s);
  		*refOut = ref;
 +		*existing = true;
  		return kIOReturnSuccess;
  	}
  	IOLockUnlock(fLock);
 @@ -615,7 +623,8 @@
- IOSurfaceRootUserClient::returnSurface(SweetSurface *s, IOExternalMethodArguments *args)
+ IOSurfaceRootUserClient::returnSurface(NabuSurface *s, IOExternalMethodArguments *args)
  {
- 	SweetSurfaceRef *ref = NULL;
+ 	NabuSurfaceRef *ref = NULL;
 -	IOReturn ret = addRef(s, &ref);
 +	bool existing = false;
 +	IOReturn ret = addRef(s, &ref, &existing);
@@ -50,12 +50,12 @@
 @@ -624,10 +633,13 @@
  		ret = kIOReturnNoMemory;
  	} else {
- 		sweet_surface_fill_result(s, ref, out);
+ 		nabu_surface_fill_result(s, ref, out);
 +		if (existing) {
 +			put64(out, 0x00, ~0ULL);        /* "already yours": use the cached client */
 +		}
- 		ret = sweet_struct_out(args, out, SWEET_SURFACE_RESULT_SIZE);
- 		IOFreeData(out, SWEET_SURFACE_RESULT_SIZE);
+ 		ret = nabu_struct_out(args, out, NABU_SURFACE_RESULT_SIZE);
+ 		IOFreeData(out, NABU_SURFACE_RESULT_SIZE);
  	}
 -	if (ret != kIOReturnSuccess) {
 +	if (ret != kIOReturnSuccess && !existing) {

@@ -26,7 +26,7 @@ S_ATTR_CODE = 0x80000400		# PURE_INSTRUCTIONS | SOME_INSTRUCTIONS
 BASE, SEG = 0x100000000, 0x4000		# arm64 user segments are 16K aligned
 CODE_OFF = 0x400			# after the load commands
 CS_PAGE_SHIFT = 12
-IDENT = b'org.sweet.init\0'
+IDENT = b'org.nabu.init\0'
 
 
 def text_of(obj):

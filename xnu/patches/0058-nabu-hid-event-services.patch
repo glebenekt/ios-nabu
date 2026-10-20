@@ -1,10 +1,10 @@
 --- a/iokit/conf/files.arm64
 +++ b/iokit/conf/files.arm64
 @@ -15,3 +15,7 @@
- iokit/Kernel/arm/SweetWatchdog.cpp                               optional iokitcpp
- iokit/Kernel/arm/SweetSurface.cpp                                optional iokitcpp
- iokit/Kernel/arm/SweetFramebuffer.cpp                            optional iokitcpp
-+iokit/Kernel/arm/hid/SweetHID.cpp                                optional iokitcpp
+ iokit/Kernel/arm/NabuWatchdog.cpp                               optional iokitcpp
+ iokit/Kernel/arm/NabuSurface.cpp                                optional iokitcpp
+ iokit/Kernel/arm/NabuFramebuffer.cpp                            optional iokitcpp
++iokit/Kernel/arm/hid/NabuHID.cpp                                optional iokitcpp
 +iokit/Kernel/arm/hid/IOHIDEvent.cpp                              optional iokitcpp
 +iokit/Kernel/arm/hid/IOHIDEventServiceQueue.cpp                  optional iokitcpp
 +iokit/Kernel/arm/hid/IOHIDEventServiceUserClient.cpp             optional iokitcpp
@@ -12,17 +12,17 @@
 +++ b/iokit/KernelConfigTables.cpp
 @@ -67,6 +67,16 @@
      "     'IOProviderClass' = IOPlatformDevice;"
-     "     'IONameMatch'     = 'sweet,display';"
+     "     'IONameMatch'     = 'nabu,display';"
      "   },"
 +    "   {"
-+    "     'IOClass'         = SweetHIDButtons;"
++    "     'IOClass'         = NabuHIDButtons;"
 +    "     'IOProviderClass' = IOResources;"
-+    "     'IOMatchCategory' = SweetHIDButtons;"
++    "     'IOMatchCategory' = NabuHIDButtons;"
 +    "   },"
 +    "   {"
-+    "     'IOClass'         = SweetHIDTouch;"
++    "     'IOClass'         = NabuHIDTouch;"
 +    "     'IOProviderClass' = IOResources;"
-+    "     'IOMatchCategory' = SweetHIDTouch;"
++    "     'IOMatchCategory' = NabuHIDTouch;"
 +    "   },"
  #endif
      "   {"
@@ -56,7 +56,7 @@
 +++ b/iokit/Kernel/arm/hid/IOGraphicsTypes.h
 @@ -0,0 +1,22 @@
 +/*
-+ * SWEET: the two IOGraphics types the HID headers use (IOGraphicsFamily
++ * NABU: the two IOGraphics types the HID headers use (IOGraphicsFamily
 + * is not part of xnu). Layouts as in IOKit/graphics/IOGraphicsTypes.h.
 + */
 +#ifndef _IOKIT_IOGRAPHICSTYPES_H
@@ -94,7 +94,7 @@
 +#include <IOKit/IOLib.h>
 +
 +/*
-+ * SWEET: HID logging goes to the kernel console (and so the persistent
++ * NABU: HID logging goes to the kernel console (and so the persistent
 + * log) instead of os_log, so the HID path is visible in boot logs.
 + */
 +#define HIDLog(fmt, ...)        IOLog("HID: " fmt "\n", ##__VA_ARGS__)
@@ -372,7 +372,7 @@
 +#ifndef IOHIDDeviceTypes_h
 +#define IOHIDDeviceTypes_h
 +
-+/* SWEET: kernel build, no SDK TargetConditionals.h */
++/* NABU: kernel build, no SDK TargetConditionals.h */
 +#ifndef TARGET_OS_DRIVERKIT
 +#define TARGET_OS_DRIVERKIT 0
 +#endif
@@ -694,7 +694,7 @@
 +#include "IOHIDEventData.h"
 +#include "IOHIDUsageTables.h"
 +#include "IOHIDPrivateKeys.h"
-+/* SWEET: no <math.h> in the kernel; only NAN is used */
++/* NABU: no <math.h> in the kernel; only NAN is used */
 +#ifndef NAN
 +#define NAN __builtin_nanf("")
 +#endif
@@ -2502,7 +2502,7 @@
 +#ifndef _IOKIT_IOHIDEVENT_H
 +#define _IOKIT_IOHIDEVENT_H
 +
-+/* SWEET: kernel build, no SDK TargetConditionals.h */
++/* NABU: kernel build, no SDK TargetConditionals.h */
 +#ifndef TARGET_OS_DRIVERKIT
 +#define TARGET_OS_DRIVERKIT 0
 +#endif
@@ -12121,7 +12121,7 @@
 +++ b/iokit/Kernel/arm/hid/IOHIDEventService.h
 @@ -0,0 +1,75 @@
 +/*
-+ * SWEET: minimal IOHIDEventService.
++ * NABU: minimal IOHIDEventService.
 + *
 + * Apple's IOHIDFamily kext is not part of xnu. The iOS 16.7 userland
 + * (IOKit.framework's HID event system, IOHIDFamily-1915.140.3) talks to
@@ -14834,7 +14834,7 @@
 +#ifndef _IOKIT_IOHIDEVENTTYPES_H
 +#define _IOKIT_IOHIDEVENTTYPES_H /* { */
 +
-+/* SWEET: kernel build, no SDK TargetConditionals.h */
++/* NABU: kernel build, no SDK TargetConditionals.h */
 +#ifndef TARGET_OS_DRIVERKIT
 +#define TARGET_OS_DRIVERKIT 0
 +#endif
@@ -20592,10 +20592,10 @@
 +#endif /* !_DEV_EVENT_H */
 +
 --- /dev/null
-+++ b/iokit/Kernel/arm/hid/SweetHID.cpp
++++ b/iokit/Kernel/arm/hid/NabuHID.cpp
 @@ -0,0 +1,539 @@
 +/*
-+ * SWEET: HID event services for the iOS userland (backboardd's HID event
++ * NABU: HID event services for the iOS userland (backboardd's HID event
 + * system).
 + *
 + * backboardd watches for IOService objects with HIDServiceSupport = true,
@@ -20605,11 +20605,11 @@
 + * shared queue. This file has the minimal IOHIDEventService base class and
 + * two services:
 + *
-+ *   SweetHIDButtons  consumer-control keys (power, volume, home)
-+ *   SweetHIDTouch    the built-in touch screen (digitizer collections)
++ *   NabuHIDButtons  consumer-control keys (power, volume, home)
++ *   NabuHIDTouch    the built-in touch screen (digitizer collections)
 + *
-+ * Hardware drivers feed them through the C entry points sweet_hid_key()
-+ * and sweet_hid_touch(). Boot-arg sweethidtest=N (seconds) presses Home
++ * Hardware drivers feed them through the C entry points nabu_hid_key()
++ * and nabu_hid_touch(). Boot-arg nabuhidtest=N (seconds) presses Home
 + * every N seconds, to test the event path without input hardware.
 + */
 +#include <IOKit/IOLib.h>
@@ -20663,7 +20663,7 @@
 +	OSString *product = getProduct();
 +	setProperty(kIOHIDTransportKey, transport);
 +	setProperty(kIOHIDProductKey, product);
-+	setProperty(kIOHIDManufacturerKey, "Sweet");
++	setProperty(kIOHIDManufacturerKey, "Nabu");
 +	setProperty(kIOHIDVendorIDKey, getVendorID(), 32);
 +	setProperty(kIOHIDProductIDKey, getProductID(), 32);
 +	setProperty(kIOHIDLocationIDKey, (unsigned long long)getProductID(), 32);
@@ -20724,7 +20724,7 @@
 +		ok = super::open(client, options, data);
 +	}
 +	OSSafeReleaseNULL(data);
-+	IOLog("SWEET HID: %s open by %s -> %d\n", getName(), client ? client->getName() : "?", ok);
++	IOLog("NABU HID: %s open by %s -> %d\n", getName(), client ? client->getName() : "?", ok);
 +	return ok;
 +}
 +
@@ -20892,7 +20892,7 @@
 +	IOUserClient *client;
 +
 +	if (type != kIOHIDEventServiceUserClientType) {
-+		IOLog("SWEET HID: %s user client type 0x%x unsupported\n", getName(), (unsigned)type);
++		IOLog("NABU HID: %s user client type 0x%x unsupported\n", getName(), (unsigned)type);
 +		return super::newUserClient(owningTask, securityID, type, properties, handler);
 +	}
 +	client = OSTypeAlloc(IOHIDEventServiceUserClient);
@@ -20901,7 +20901,7 @@
 +	}
 +	if (!client->initWithTask(owningTask, securityID, type)) {
 +		client->release();
-+		IOLog("SWEET HID: %s user client init refused\n", getName());
++		IOLog("NABU HID: %s user client init refused\n", getName());
 +		return kIOReturnBadArgument;
 +	}
 +	if (!client->attach(this)) {
@@ -20921,8 +20921,8 @@
 + * Buttons. iOS takes the side/volume/home buttons as consumer-control
 + * keyboard events (AppleM68Buttons publishes the same usage pair).
 + */
-+class SweetHIDButtons : public IOHIDEventService {
-+	OSDeclareDefaultStructors(SweetHIDButtons);
++class NabuHIDButtons : public IOHIDEventService {
++	OSDeclareDefaultStructors(NabuHIDButtons);
 +public:
 +	virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
 +	void key(UInt32 usage, bool down);
@@ -20936,16 +20936,16 @@
 +	UInt32 fTestSecs;
 +	UInt32 fTestCount;
 +};
-+OSDefineMetaClassAndStructors(SweetHIDButtons, IOHIDEventService);
++OSDefineMetaClassAndStructors(NabuHIDButtons, IOHIDEventService);
 +
 +/*
 + * Touch screen: digitizer collection events with finger children,
 + * coordinates normalized to 0..1 like IOHIDEventDriver produces for
 + * absolute digitizers.
 + */
-+#define SWEET_TOUCH_FINGERS 10
-+class SweetHIDTouch : public IOHIDEventService {
-+	OSDeclareDefaultStructors(SweetHIDTouch);
++#define NABU_TOUCH_FINGERS 10
++class NabuHIDTouch : public IOHIDEventService {
++	OSDeclareDefaultStructors(NabuHIDTouch);
 +public:
 +	virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
 +	void touch(int finger, bool down, int x, int y);
@@ -20955,40 +20955,40 @@
 +	virtual UInt32 getProductID() APPLE_KEXT_OVERRIDE { return 2; }
 +private:
 +	IOLock *fLock;
-+	bool fDown[SWEET_TOUCH_FINGERS];
-+	IOFixed fX[SWEET_TOUCH_FINGERS];
-+	IOFixed fY[SWEET_TOUCH_FINGERS];
++	bool fDown[NABU_TOUCH_FINGERS];
++	IOFixed fX[NABU_TOUCH_FINGERS];
++	IOFixed fY[NABU_TOUCH_FINGERS];
 +};
-+OSDefineMetaClassAndStructors(SweetHIDTouch, IOHIDEventService);
++OSDefineMetaClassAndStructors(NabuHIDTouch, IOHIDEventService);
 +
-+static SweetHIDButtons *gSweetButtons;
-+static SweetHIDTouch *gSweetTouch;
++static NabuHIDButtons *gNabuButtons;
++static NabuHIDTouch *gNabuTouch;
 +
 +bool
-+SweetHIDButtons::start(IOService *provider)
++NabuHIDButtons::start(IOService *provider)
 +{
 +	if (!IOHIDEventService::start(provider)) {
 +		return false;
 +	}
-+	if (PE_parse_boot_argn("sweethidtest", &fTestSecs, sizeof(fTestSecs)) && fTestSecs) {
-+		fTest = IOTimerEventSource::timerEventSource(this, &SweetHIDButtons::testFired);
++	if (PE_parse_boot_argn("nabuhidtest", &fTestSecs, sizeof(fTestSecs)) && fTestSecs) {
++		fTest = IOTimerEventSource::timerEventSource(this, &NabuHIDButtons::testFired);
 +		if (fTest && _hidWorkLoop->addEventSource(fTest) == kIOReturnSuccess) {
 +			fTest->setTimeoutMS(fTestSecs * 1000);
 +		}
 +	}
-+	gSweetButtons = this;
++	gNabuButtons = this;
 +	registerService();
-+	IOLog("SWEET HID: buttons registered (test every %u s)\n", fTestSecs);
++	IOLog("NABU HID: buttons registered (test every %u s)\n", fTestSecs);
 +	return true;
 +}
 +
 +void
-+SweetHIDButtons::key(UInt32 usage, bool down)
++NabuHIDButtons::key(UInt32 usage, bool down)
 +{
 +	IOHIDEvent *event = IOHIDEvent::keyboardEvent(mach_absolute_time(), kHIDPage_Consumer, usage, down);
 +
 +	if (event) {
-+		IOLog("SWEET HID: key 0x%x %s (%u clients)\n", (unsigned)usage, down ? "down" : "up",
++		IOLog("NABU HID: key 0x%x %s (%u clients)\n", (unsigned)usage, down ? "down" : "up",
 +		    _clients ? _clients->getCount() : 0);
 +		dispatchEvent(event);
 +		event->release();
@@ -20996,9 +20996,9 @@
 +}
 +
 +void
-+SweetHIDButtons::testFired(OSObject *owner, IOTimerEventSource *sender)
++NabuHIDButtons::testFired(OSObject *owner, IOTimerEventSource *sender)
 +{
-+	SweetHIDButtons *self = (SweetHIDButtons *)owner;
++	NabuHIDButtons *self = (NabuHIDButtons *)owner;
 +
 +	/*
 +	 * Home (Menu) press, then the release 100 ms later; Setup's "Hello"
@@ -21012,7 +21012,7 @@
 +}
 +
 +bool
-+SweetHIDTouch::start(IOService *provider)
++NabuHIDTouch::start(IOService *provider)
 +{
 +	fLock = IOLockAlloc();
 +	if (!fLock || !IOHIDEventService::start(provider)) {
@@ -21022,20 +21022,20 @@
 +	setProperty("DisplayIntegrated", kOSBooleanTrue);
 +	setProperty("SurfaceWidth", (unsigned long long)(68 << 16), 32);	/* mm, 16.16 */
 +	setProperty("SurfaceHeight", (unsigned long long)(151 << 16), 32);
-+	gSweetTouch = this;
++	gNabuTouch = this;
 +	registerService();
-+	IOLog("SWEET HID: touch registered\n");
++	IOLog("NABU HID: touch registered\n");
 +	return true;
 +}
 +
 +void
-+SweetHIDTouch::touch(int finger, bool down, int x, int y)
++NabuHIDTouch::touch(int finger, bool down, int x, int y)
 +{
 +	uint64_t now = mach_absolute_time();
 +	IOHIDEvent *collection;
 +	bool any = false;
 +
-+	if (finger < 0 || finger >= SWEET_TOUCH_FINGERS) {
++	if (finger < 0 || finger >= NABU_TOUCH_FINGERS) {
 +		return;
 +	}
 +	x = x < 0 ? 0 : (x > 1079 ? 1079 : x);
@@ -21059,7 +21059,7 @@
 +	collection->setIntegerValue(kIOHIDEventFieldDigitizerCollection, TRUE);
 +
 +	UInt32 cmask = 0;
-+	for (int i = 0; i < SWEET_TOUCH_FINGERS; i++) {
++	for (int i = 0; i < NABU_TOUCH_FINGERS; i++) {
 +		bool d = (i == finger) ? down : fDown[i];
 +		if (i != finger && !d) {
 +			continue;
@@ -21106,7 +21106,7 @@
 +	IOLockUnlock(fLock);
 +
 +	if (was != down) {
-+		IOLog("SWEET HID: touch %d %s at %d,%d\n", finger, down ? "down" : "up", x, y);
++		IOLog("NABU HID: touch %d %s at %d,%d\n", finger, down ? "down" : "up", x, y);
 +	}
 +	dispatchEvent(collection);
 +	collection->release();
@@ -21114,23 +21114,23 @@
 +
 +/* key: 0 power (side button), 1 volume up, 2 volume down, 3 home */
 +extern "C" void
-+sweet_hid_key(int key, int down)
++nabu_hid_key(int key, int down)
 +{
 +	static const UInt32 usages[] = {
 +		kHIDUsage_Csmr_Power, kHIDUsage_Csmr_VolumeIncrement,
 +		kHIDUsage_Csmr_VolumeDecrement, kHIDUsage_Csmr_Menu,
 +	};
 +
-+	if (gSweetButtons && key >= 0 && key < (int)(sizeof(usages) / sizeof(usages[0]))) {
-+		gSweetButtons->key(usages[key], down != 0);
++	if (gNabuButtons && key >= 0 && key < (int)(sizeof(usages) / sizeof(usages[0]))) {
++		gNabuButtons->key(usages[key], down != 0);
 +	}
 +}
 +
 +extern "C" void
-+sweet_hid_touch(int finger, int down, int x, int y)
++nabu_hid_touch(int finger, int down, int x, int y)
 +{
-+	if (gSweetTouch) {
-+		gSweetTouch->touch(finger, down != 0, x, y);
++	if (gNabuTouch) {
++		gNabuTouch->touch(finger, down != 0, x, y);
 +	}
 +}
 --- /dev/null

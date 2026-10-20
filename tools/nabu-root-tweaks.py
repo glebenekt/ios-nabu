@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the SWEET bring-up changes to an iOS root made by tools/mkiosroot.sh.
+"""Apply the NABU bring-up changes to an iOS root made by tools/mkiosroot.sh.
 
   sudo nabu-root-tweaks.py MOUNTED_ROOT
 

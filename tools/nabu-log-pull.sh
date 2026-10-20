@@ -1,5 +1,5 @@
 #!/bin/sh
-# Read the SWEET console log (kernel patch 0047) from a phone booted into
+# Read the NABU console log (kernel patch 0047) from a phone booted into
 # OrangeFox recovery (fastboot boot recovery/recovery.img; adb root shell).
 #   tools/nabu-log-pull.sh [-s SERIAL] OUT.txt
 # Only reads: the last 1025 blocks (4 KiB) of the userdata partition.

@@ -1,8 +1,12 @@
 #!/bin/bash
-# Pinned, portable constant-time AES for the SWEET legacy CBC/ECB API.
+# Pinned, portable constant-time AES for the NABU legacy CBC/ECB API.
 set -euo pipefail
-[[ "${MACHINE_CONFIG:-}" == SWEET ]] || exit 0
+[[ "${MACHINE_CONFIG:-}" == NABU ]] || exit 0
 [[ -f libkern/crypto/corecrypto_aes.c ]] || exit 1
+if [[ -d libkern/crypto/nabu_bearssl ]]; then
+    echo "BearSSL source already staged; skipping"
+    exit 0
+fi
 bearssl_sha=7bea48e5e850ab4cafbe68d3765cdaba13a86d6f
 bearssl_tmp=$(mktemp -d)
 trap 'rm -rf "$bearssl_tmp"' EXIT
@@ -17,7 +21,7 @@ import shutil
 import sys
 
 source = Path(sys.argv[1])
-target = Path('libkern/crypto/sweet_bearssl')
+target = Path('libkern/crypto/nabu_bearssl')
 if target.exists():
     raise SystemExit(f'refusing to overwrite existing AES source: {target}')
 shutil.copytree(source / 'inc', target / 'inc')
@@ -42,4 +46,4 @@ for name in ('hash/md5.c', 'codec/dec32le.c', 'codec/enc32le.c',
     shutil.copy2(source / 'src' / name, target / 'src' / name)
 shutil.copy2(source / 'LICENSE.txt', target / 'LICENSE.txt')
 PY
-echo "Staged BearSSL portable AES, MD5, SHA-1 and SHA-384/512 ($bearssl_sha) for SWEET"
+echo "Staged BearSSL portable AES, MD5, SHA-1 and SHA-384/512 ($bearssl_sha) for NABU"

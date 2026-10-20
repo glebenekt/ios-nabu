@@ -1,16 +1,16 @@
-diff --git a/iokit/Kernel/arm/SweetCPU.cpp b/iokit/Kernel/arm/SweetCPU.cpp
+diff --git a/iokit/Kernel/arm/NabuCPU.cpp b/iokit/Kernel/arm/NabuCPU.cpp
 new file mode 100644
 --- /dev/null
-+++ b/iokit/Kernel/arm/SweetCPU.cpp
++++ b/iokit/Kernel/arm/NabuCPU.cpp
 @@ -0,0 +1,171 @@
 +/*
-+ * Single-CPU bring-up for sweet using XNU's legacy IOCPU interface.
++ * Single-CPU bring-up for nabu using XNU's legacy IOCPU interface.
 + * The architected timer and SGI1 already enter through pe_fiq/sleh_irq.
 + * Secondary CPU startup and system suspend require separate platform work.
 + */
 +#include <pexpert/arm64/board_config.h>
 +
-+#if defined(SWEET)
++#if defined(NABU)
 +#include <IOKit/IOCPU.h>
 +#include <IOKit/IOLib.h>
 +#include <libkern/c++/OSData.h>
@@ -21,8 +21,8 @@ new file mode 100644
 +#include <kern/processor.h>
 +#include <mach/mach_time.h>
 +
-+class SweetCPU : public IOCPU {
-+	OSDeclareDefaultStructors(SweetCPU);
++class NabuCPU : public IOCPU {
++	OSDeclareDefaultStructors(NabuCPU);
 +	const OSSymbol *cpuName = NULL;
 +
 +public:
@@ -36,10 +36,10 @@ new file mode 100644
 +	const OSSymbol *getCPUName(void) APPLE_KEXT_OVERRIDE;
 +};
 +
-+OSDefineMetaClassAndStructors(SweetCPU, IOCPU);
++OSDefineMetaClassAndStructors(NabuCPU, IOCPU);
 +
 +bool
-+SweetCPU::start(IOService *provider)
++NabuCPU::start(IOService *provider)
 +{
 +	const ml_topology_info_t *topology = ml_get_topology_info();
 +	const ml_topology_cpu_t *cpu = topology->boot_cpu;
@@ -52,7 +52,7 @@ new file mode 100644
 +		return false;
 +	}
 +	if (topology->num_cpus != 1) {
-+		panic("SWEET CPU: only single-CPU bring-up is supported");
++		panic("NABU CPU: only single-CPU bring-up is supported");
 +	}
 +	if (!IOCPU::start(provider)) {
 +		return false;
@@ -76,16 +76,16 @@ new file mode 100644
 +	perfmon_interrupt_handler_func pmi_handler = NULL;
 +	kern_return_t result = ml_processor_register(&info, &machProcessor, &ipi_handler, &pmi_handler);
 +	if (result != KERN_SUCCESS) {
-+		panic("SWEET CPU: ml_processor_register failed: %d", result);
++		panic("NABU CPU: ml_processor_register failed: %d", result);
 +	}
 +	if (pmi_handler != NULL) {
-+		panic("SWEET CPU: PMI routing is not implemented");
++		panic("NABU CPU: PMI routing is not implemented");
 +	}
 +
 +	/* Re-enter the boot CPU through cpu_machine_init -> PE_cpu_machine_init. */
 +	result = processor_start(machProcessor);
 +	if (result != KERN_SUCCESS || getCPUState() != kIOCPUStateRunning) {
-+		panic("SWEET CPU: processor_start failed: %d", result);
++		panic("NABU CPU: processor_start failed: %d", result);
 +	}
 +	ml_cpu_init_completed();
 +	cpusRunning();
@@ -94,23 +94,23 @@ new file mode 100644
 +
 +	/* Announce completion only after registration, startup and SGI validation. */
 +	ml_set_max_cpus(topology->max_cpu_id + 1);
-+	IOLog("SWEET CPU: boot CPU %u registered, SGI1 verified, initialization complete\n",
++	IOLog("NABU CPU: boot CPU %u registered, SGI1 verified, initialization complete\n",
 +	    getCPUNumber());
 +	return true;
 +}
 +
 +void
-+SweetCPU::free(void)
++NabuCPU::free(void)
 +{
 +	OSSafeReleaseNULL(cpuName);
 +	IOCPU::free();
 +}
 +
 +void
-+SweetCPU::initCPU(bool boot)
++NabuCPU::initCPU(bool boot)
 +{
 +	if (!boot) {
-+		panic("SWEET CPU: resume is not implemented");
++		panic("NABU CPU: resume is not implemented");
 +	}
 +	assert(cpu_number() == (int)getCPUNumber());
 +	assert(ml_get_interrupts_enabled());
@@ -122,7 +122,7 @@ new file mode 100644
 +	signalCPU(this);
 +	while (!ml_cpu_signal_is_enabled()) {
 +		if (mach_absolute_time() > deadline) {
-+			panic("SWEET CPU: SGI1 self-test timed out");
++			panic("NABU CPU: SGI1 self-test timed out");
 +		}
 +		__asm__ volatile("yield");
 +	}
@@ -130,59 +130,59 @@ new file mode 100644
 +}
 +
 +void
-+SweetCPU::signalCPU(IOCPU *target)
++NabuCPU::signalCPU(IOCPU *target)
 +{
 +	/* Only the boot CPU is registered by this driver. */
 +	if (target != this || cpu_number() != (int)getCPUNumber()) {
-+		panic("SWEET CPU: secondary CPU signalling is not implemented");
++		panic("NABU CPU: secondary CPU signalling is not implemented");
 +	}
 +	uint64_t mpidr = __builtin_arm_rsr64("MPIDR_EL1");
 +	unsigned int aff0 = mpidr & 0xff;
 +	if (aff0 >= 16) {
-+		panic("SWEET CPU: SGI target requires unsupported range selector");
++		panic("NABU CPU: SGI target requires unsupported range selector");
 +	}
 +	uint64_t sgi = (((mpidr >> 32) & 0xff) << 48) |
 +	    (((mpidr >> 16) & 0xff) << 32) |
 +	    (((mpidr >> 8) & 0xff) << 16) |
-+	    ((uint64_t)SWEET_IPI_SGI << 24) | (1ULL << aff0);
++	    ((uint64_t)NABU_IPI_SGI << 24) | (1ULL << aff0);
 +	__builtin_arm_dsb(DSB_ISHST);
 +	__builtin_arm_wsr64("ICC_SGI1R_EL1", sgi);
 +	__builtin_arm_isb(ISB_SY);
 +}
 +
 +kern_return_t
-+SweetCPU::startCPU(vm_offset_t start_paddr __unused, vm_offset_t arg_paddr __unused)
++NabuCPU::startCPU(vm_offset_t start_paddr __unused, vm_offset_t arg_paddr __unused)
 +{
 +	return KERN_NOT_SUPPORTED;
 +}
 +
 +void
-+SweetCPU::quiesceCPU(void)
++NabuCPU::quiesceCPU(void)
 +{
-+	panic("SWEET CPU: CPU quiesce is not implemented");
++	panic("NABU CPU: CPU quiesce is not implemented");
 +}
 +
 +void
-+SweetCPU::haltCPU(void)
++NabuCPU::haltCPU(void)
 +{
-+	panic("SWEET CPU: CPU halt/suspend is not implemented");
++	panic("NABU CPU: CPU halt/suspend is not implemented");
 +}
 +
 +const OSSymbol *
-+SweetCPU::getCPUName(void)
++NabuCPU::getCPUName(void)
 +{
 +	return cpuName;
 +}
-+#endif /* SWEET */
++#endif /* NABU */
 diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
 --- a/iokit/KernelConfigTables.cpp
 +++ b/iokit/KernelConfigTables.cpp
 @@ -41,6 +41,12 @@
-     "     'IONameMatch'     = 'xiaomi,sweet';"
+     "     'IONameMatch'     = 'xiaomi,nabu';"
      "     'IOProbeScore'    = 10000:32;"
      "   },"
 +    "   {"
-+    "     'IOClass'         = SweetCPU;"
++    "     'IOClass'         = NabuCPU;"
 +    "     'IOProviderClass' = IOPlatformDevice;"
 +    "     'IONameMatch'     = 'qcom,kryo470';"
 +    "     'IOProbeScore'    = 10000:32;"
@@ -195,7 +195,7 @@ diff --git a/iokit/conf/files.arm64 b/iokit/conf/files.arm64
 +++ b/iokit/conf/files.arm64
 @@ -8,3 +8,5 @@
  
- # SWEET device-tree platform (empty translation unit on other boards)
- iokit/Kernel/arm/SweetPlatformExpert.cpp                         optional iokitcpp
+ # NABU device-tree platform (empty translation unit on other boards)
+ iokit/Kernel/arm/NabuPlatformExpert.cpp                         optional iokitcpp
 +
-+iokit/Kernel/arm/SweetCPU.cpp                                    optional iokitcpp
++iokit/Kernel/arm/NabuCPU.cpp                                    optional iokitcpp

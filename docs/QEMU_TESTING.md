@@ -1,6 +1,6 @@
-# QEMU Emulation & Testing Guide for ios-sweet
+# QEMU Emulation & Testing Guide for ios-nabu
 
-This document explains how to test the patched Apple XNU kernel for the Redmi Note 10 Pro (`sweet`, SM7150) in QEMU virtual machine without touching physical hardware or risking device user data.
+This document explains how to test the patched Apple XNU kernel for the Redmi Note 10 Pro (`nabu`, SM7150) in QEMU virtual machine without touching physical hardware or risking device user data.
 
 ---
 
@@ -50,9 +50,9 @@ If dependencies are missing, install them:
    python3 tools/mkadt.py /tmp/qemu.adt --qemu
    ```
 
-2. **Pack the Kernel and ADT into a SWEETXNU Payload:**
+2. **Pack the Kernel and ADT into a NABUXNU Payload:**
    ```sh
-   python3 tools/mkpayload.py xnu/out/kernel.development.sweet /tmp/qemu.adt /tmp/payload-qemu.bin \
+   python3 tools/mkpayload.py xnu/out/kernel.development.nabu /tmp/qemu.adt /tmp/payload-qemu.bin \
        --cmdline 'debug=0xc serial=3 cpus=1 keepsyms=1 -enable_kprintf_spam rd=md0'
    ```
 
@@ -75,7 +75,7 @@ python3 tools/qemu-nabu.py /tmp/payload-qemu.bin /tmp/qemu_run --live-serial
 Exit with status code `2` if a panic occurred or `3` if blank/undecodable:
 ```sh
 python3 tools/qemu-nabu.py /tmp/payload-qemu.bin /tmp/qemu_run \
-    --kernel xnu/out/kernel.development.sweet \
+    --kernel xnu/out/kernel.development.nabu \
     --fail-on-panic
 ```
 
