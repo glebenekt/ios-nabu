@@ -1077,6 +1077,26 @@ new file mode 100644
 diff --git a/iokit/Kernel/IOService.cpp b/iokit/Kernel/IOService.cpp
 --- a/iokit/Kernel/IOService.cpp
 +++ b/iokit/Kernel/IOService.cpp
+@@ -5126,7 +5126,7 @@
+ 	bool                wasHiding;
+ 
+ 	iomediaClass = OSMetaClass::getMetaClassWithName(gIOMediaKey);
+-#if !defined(ARM64_BOARD_CONFIG_SWEET)
++#if !defined(ARM64_BOARD_CONFIG_SWEET) && !defined(ARM64_BOARD_CONFIG_NABU)
+ 	assert(iomediaClass);
+ #endif
+ 
+@@ -5137,8 +5137,8 @@
+ 	}
+ 	UNLOCKNOTIFY();
+ 
+-#if defined(ARM64_BOARD_CONFIG_SWEET)
+-	/* SWEET has no IOStorageFamily: without the IOMedia class no media exists to unhide. */
++#if defined(ARM64_BOARD_CONFIG_SWEET) || defined(ARM64_BOARD_CONFIG_NABU)
++	/* SWEET/NABU have no IOStorageFamily: without IOMedia no media exists to unhide. */
+ 	if (!iomediaClass) {
+ 		wasHiding = false;
+ 	}
 @@ -5188,10 +5188,11 @@
  	bool unhide;
  
