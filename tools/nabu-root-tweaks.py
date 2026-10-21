@@ -33,6 +33,22 @@ BUILD, VERSION = '20H392', '16.7.16'
 MOBILE = 501
 
 
+def system_version(root):
+    """Use the build/version actually present in the image.
+
+    The port boots more than one Apple OS release (iPhone X iOS 16.7.16 and
+    iPad7,3 iPadOS 16.6.1), so DataMigration and the activation ark must match
+    the root, not a hard-coded build.
+    """
+    path = os.path.join(root, 'System/Library/CoreServices/SystemVersion.plist')
+    try:
+        data = load(path)
+        return (data.get('ProductBuildVersion') or BUILD,
+                data.get('ProductVersion') or VERSION)
+    except Exception:
+        return BUILD, VERSION
+
+
 def load(path):
     with open(path, 'rb') as f:
         return plistlib.load(f)
@@ -90,7 +106,7 @@ def find_container(root, kind, identifier):
     return None
 
 
-def activation(root):
+def activation(root, build=BUILD, version=VERSION):
     c = find_container(root, 'Data/System', 'com.apple.mobileactivationd')
     if c is None:
         print('warning: no mobileactivationd system container in the image; skipped data ark')
@@ -101,7 +117,7 @@ def activation(root):
     os.chmod(d, 0o755)
     save(os.path.join(d, 'data_ark.plist'), {
         '-ActivationState': 'Activated', '-BrickState': False,
-        '-BuildVersion': BUILD, '-ProductVersion': VERSION,
+        '-BuildVersion': build, '-ProductVersion': version,
         '-DataMigrationCompleted': True, '-PreSydroDataMigrationCompleted': True,
     }, MOBILE, MOBILE, 0o600)
     print('data ark', d)
@@ -126,13 +142,15 @@ def main():
     if len(sys.argv) != 2 or not os.path.isdir(os.path.join(sys.argv[1], 'System/Library/xpc')):
         sys.exit(__doc__)
     root = sys.argv[1]
+    build, version = system_version(root)
+    print(f'root image: iOS/iPadOS {version} ({build})')
     launchd(root)
     containers(root)
-    activation(root)
+    activation(root, build, version)
     audio(root)
     merge_pref(root, 'com.apple.migration', {
-        'LastSystemVersion': BUILD,
-        'DMUserDataDisposition': {'SyntheticDidUpgrade': False, 'buildVersion': BUILD}})
+        'LastSystemVersion': build,
+        'DMUserDataDisposition': {'SyntheticDidUpgrade': False, 'buildVersion': build}})
     merge_pref(root, 'com.apple.springboard', {
         'BKNoWatchdogs': True,
         'FBLaunchWatchdogExceptions': {'com.apple.purplebuddy': 100.0},

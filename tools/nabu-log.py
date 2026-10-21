@@ -12,8 +12,9 @@ import struct, sys
 
 data = open(sys.argv[1], 'rb').read()
 magic, version, size, total, seq = struct.unpack_from('<8sIIQQ', data, 0)
-if magic != b'NABULOG':
-    sys.exit('no NABULOG header (log never flushed, or wrong area)')
+magic = magic.rstrip(b'\0')
+if magic not in (b'SWEETLOG', b'NABULOG'):
+    sys.exit('no NABULOG/SWEETLOG header (log never flushed, or wrong area)')
 ring = data[4096:4096 + size]
 if total <= size:
     text = ring[:total]
