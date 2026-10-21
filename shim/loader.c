@@ -19,6 +19,25 @@ struct payload_seg {
 	uint64_t vmaddr, vmsize, file_off, file_size;
 };
 
+static inline uint64_t
+loader_ticks(void)
+{
+	uint64_t t;
+	__asm__ volatile("isb; mrs %0, cntpct_el0" : "=r"(t));
+	return t;
+}
+
+static uint32_t
+loader_us(uint64_t ticks)
+{
+	uint64_t freq;
+	__asm__ volatile("mrs %0, cntfrq_el0" : "=r"(freq));
+	if (freq == 0) {
+		freq = 19200000;	/* nabu's known timer frequency */
+	}
+	return (uint32_t)(ticks * 1000000ULL / freq);
+}
+
 struct payload {
 	char magic[8];
 	uint32_t version, nsegs;
@@ -100,6 +119,7 @@ const char *loader_boot(uintptr_t dtb)
 	if (rd_end > p->phys_base && rd_start < p->phys_base + p->mem_size)
 		return "ramdisk overlaps kernel memory";
 
+	uint64_t t_copy0 = loader_ticks();
 	for (uint32_t i = 0; i < p->nsegs; i++) {
 		const struct payload_seg *s = &p->segs[i];
 		uintptr_t dst = s->vmaddr + pa_of_va_base;
@@ -107,6 +127,7 @@ const char *loader_boot(uintptr_t dtb)
 		if (s->vmsize > s->file_size)
 			zero64(dst + ((s->file_size + 7) & ~7UL), s->vmsize - ((s->file_size + 7) & ~7UL));
 	}
+	uint64_t t_copy1 = loader_ticks();
 	con_hex2("SEGS", "n=", p->nsegs, "end=", p->kernel_end + pa_of_va_base);
 
 	/* ADT, then boot_args, behind the kernel; everything below topOfKernelData is ours. */
@@ -135,6 +156,10 @@ const char *loader_boot(uintptr_t dtb)
 		ba->CommandLine[i] = p->cmdline[i];
 	ba->memSizeActual = p->mem_size;
 	con_hex2("BOOTARG", "pa=", ba_pa, "top=", top);
+
+	uint64_t t_prep1 = loader_ticks();
+	con_hex2("COPY", "seg_us=", loader_us(t_copy1 - t_copy0),
+	    "all_us=", loader_us(t_prep1 - t_copy0));
 
 	uintptr_t entry_pa = p->entry_va + pa_of_va_base;
 	con_hex("JUMP", entry_pa);

@@ -26,24 +26,99 @@ void con_clear(uint32_t bg)
 	row = 0;
 }
 
-static void put_char(int col, char ch, uint32_t fg)
+static void put_glyph(int x0, int y0, char ch, uint32_t fg, int scale)
 {
 	if (ch < 0x20 || ch > 0x7e)
 		ch = '?';
+	if (scale < 1)
+		scale = 1;
 	const unsigned char *g = font8x16[ch - 0x20];
-	int x0 = MARGIN + col * CH_W, y0 = MARGIN + row * CH_H;
-	if (x0 + CH_W > FB_W || y0 + CH_H > FB_H)
+	int w = 8 * scale, h = 16 * scale;
+	if (x0 < 0 || y0 < 0 || x0 + w > FB_W || y0 + h > FB_H)
 		return;
 	for (int gy = 0; gy < 16; gy++)
 		for (int gx = 0; gx < 8; gx++) {
 			uint32_t c = (g[gy] & (0x80 >> gx)) ? fg : con_bg;
-			for (int sy = 0; sy < SCALE; sy++) {
-				volatile uint32_t *p = con_fb + (y0 + gy * SCALE + sy) * (FB_STRIDE / 4)
-						       + x0 + gx * SCALE;
-				for (int sx = 0; sx < SCALE; sx++)
+			for (int sy = 0; sy < scale; sy++) {
+				volatile uint32_t *p = con_fb + (y0 + gy * scale + sy) * (FB_STRIDE / 4)
+						       + x0 + gx * scale;
+				for (int sx = 0; sx < scale; sx++)
 					p[sx] = c;
 			}
 		}
+}
+
+void con_text_at(int x, int y, const char *s, uint32_t fg, int scale)
+{
+	while (*s) {
+		put_glyph(x, y, *s++, fg, scale);
+		x += 8 * scale;
+	}
+}
+
+static void put_char(int col, char ch, uint32_t fg)
+{
+	put_glyph(MARGIN + col * CH_W, MARGIN + row * CH_H, ch, fg, SCALE);
+}
+
+void con_banner(const char *stage)
+{
+	con_clear(BG_DARK);
+
+	/* Top accent line. */
+	for (int y = 0; y < 10; y++) {
+		volatile uint32_t *line = con_fb + y * (FB_STRIDE / 4);
+		for (int x = 0; x < FB_W; x++)
+			line[x] = ACCENT;
+	}
+
+	con_text_at(80, 80, "iPadOS-nabu", WHITE, 7);
+	con_text_at(80, 240, "Xiaomi Pad 5 (nabu)  -  SM8150-AC", MUTED, 3);
+	con_text_at(80, 320, "iPadOS 16.6.1 (20G81)  /  XNU", MUTED, 3);
+	con_text_at(80, 400, "By mytiantian001", ACCENT, 3);
+
+	for (int x = 80; x < 1200; x++)
+		con_fb[480 * (FB_STRIDE / 4) + x] = ACCENT;
+
+	con_text_at(80, 540, "stage", ACCENT, 3);
+	con_text_at(80, 620, stage, WHITE, 3);
+
+	/* Leave the old diagnostic lines below the splash. */
+	row = 18;
+}
+
+void
+con_progress(int step, int total)
+{
+	const int x0 = 80, x1 = 1200, y = 700, h = 14;
+	int fill;
+
+	if (total <= 0) {
+		total = 1;
+	}
+	if (step < 0) {
+		step = 0;
+	}
+	if (step > total) {
+		step = total;
+	}
+	fill = (x1 - x0) * step / total;
+
+	for (int yy = 0; yy < h; yy++) {
+		volatile uint32_t *line = con_fb + (y + yy) * (FB_STRIDE / 4);
+		for (int x = x0; x < x1; x++) {
+			line[x] = 0xff151a24;
+		}
+		for (int x = x0; x < x0 + fill; x++) {
+			line[x] = ACCENT;
+		}
+		int px = x0 + fill;
+		for (int d = -2; d <= 2; d++) {
+			if (px + d >= x0 && px + d < x1) {
+				line[px + d] = WHITE;
+			}
+		}
+	}
 }
 
 static int put_str(int col, const char *s, uint32_t fg)

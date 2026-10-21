@@ -1,5 +1,28 @@
 # iOS 16 on nabu (Redmi Note 10 Pro, SM7150) - working notes
 
+## 2026-10-21 - iPadOS 16 UI + NT36523 probe
+
+- **Display/UI:** 1600x2560 panel; fallback presents backboardd's 1668x2224
+  BGRA surface continuously. `nabufb_crop=1` fills the panel without
+  distortion; `nabufb_stretch=1` is the distorted comparison. Current test
+  rate is `nabufb_hz=30` (was 10).
+- **Lock state:** AKS selectors 8 and 32 now succeed. The passcode prompt
+  changed to `Press home to open`; `nabuhidtest=5` (Menu/Home) then reaches
+  the home screen. No passcode exists in the keybag.
+- **Panic fixed:** the first NT36523 probe mapped the whole TLMM window
+  (`0xdc2000` = 14,434,304 bytes); `ml_io_map` failed in `kma_alloc` with
+  `KERN_NO_SPACE`. Map only `0x60000` through GPIO90. No panic after this fix.
+- **Touch:** old SE7 Goodix/I2C driver was wrong for nabu. New driver uses
+  SPI SE18 `0xc84000`, QUPv3_2 wrapper `0xcc0000`, GCC WRAP2 S1/RCG
+  `0x1e278`, pins GPIO23/24/25/26 = qup18, IRQ GPIO39, NT36523 trim
+  `0x3f004` / FWINFO `0x2fe78`. Probe builds and runs; it currently logs
+  trim/FWINFO/point frames only, HID delivery is not wired yet. Probe result
+  is still pending.
+- **Still open:** frame pacing (backboardd was caught at 52% CPU over 180 s;
+  fairplayd.A2/bluetoothd respawn about every 10 s), tearing, boot logo.
+  Real Apple logo/progress needs iBoot/bootlogo; shim-side custom animation
+  only.
+
 ## Agent handoff / active work (2026-10-15, latest)
 
 ### >>> UPDATE 2026-10-18 (read first, then the 10-17 handoff below) <<<

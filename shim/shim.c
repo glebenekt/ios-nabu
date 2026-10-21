@@ -142,7 +142,7 @@ void exc_handler(uint64_t slot, uint64_t *regs)
 		irq_handler();
 		return;
 	}
-	con_clear(BLUE);
+	con_clear(BG_DARK);
 	switch (slot & 3) {
 	case 0: con_str("PANIC", "SYNC"); break;
 	case 1: con_str("PANIC", "IRQ"); break;
@@ -376,7 +376,12 @@ void shim_main(uint64_t dtb)
 
 	/* An xnu payload in the ramdisk means: boot it (MMU stays off). */
 	stage = "loader";
-	con_clear(RED);
+	con_banner("loading XNU payload");
+	con_progress(0, 15);
+	for (int i = 1; i <= 15; i++) {
+		delay_ms(100);
+		con_progress(i, 15);
+	}
 	con_str("SHIM", "nabu milestone 4: xnu loader");
 	con_skip();
 	const char *why = loader_boot(dtb);
@@ -393,17 +398,17 @@ void shim_main(uint64_t dtb)
 	reset(20);
 
 	stage = "fill off";
-	uint64_t fill_off = ticks_fill(RED);
+	uint64_t fill_off = ticks_fill(BG_DARK);
 	uint64_t mem_off = ticks_mem();
 
 	stage = "mmu enable";
 	int rc = mmu_enable(&mi);
 
 	stage = "fill on";
-	uint64_t fill_on = rc ? 0 : ticks_fill(RED);
+	uint64_t fill_on = rc ? 0 : ticks_fill(BG_DARK);
 	uint64_t mem_on = rc ? 0 : ticks_mem();
 	if (rc)
-		con_clear(RED);
+		con_clear(ERROR_RED);
 
 	con_str("SHIM", "nabu milestone 3");
 	con_skip();
