@@ -8,3 +8,5 @@ shim/out/
 xnu/out/
 xnu/out-*/
 __pycache__/
+tools/touch-nt36523/test_nt36523
+tools/touch-nt36523/*.o
