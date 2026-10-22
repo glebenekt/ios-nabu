@@ -1,5 +1,26 @@
 # iOS 16 on nabu (Redmi Note 10 Pro, SM7150) - working notes
 
+## 2026-10-22 - new CI remote `glebenekt/ios-nabu`
+
+- **CI target moved.** Upstream `mytiantian001/iPadOS-nabu` is not writable by
+  this account, and the old `glebenekt/ios-nabu` was deleted. This same tree
+  (243 commits, head before this note `057b7f5`) was pushed to a new **public**
+  repo **`glebenekt/ios-nabu`** at commit `057b7f5`. `origin` now points there;
+  the read-only upstream is kept as remote `upstream`
+  (`mytiantian001/iPadOS-nabu`). Public = free GitHub-hosted macOS runners
+  (private minutes for this account previously ran out).
+- **First CI run on the new repo:** dispatched by `workflow_dispatch`
+  (`xnu.yml`, `MACHINE_CONFIG=NABU`, `DEVELOPMENT`) right after the push;
+  run ids `39721586068` (push) and `39721589682` (dispatch), both on `057b7f5`.
+  Not interpreted yet.
+- **Observation (not a guess):** the header says "Redmi Note 10 Pro, SM7150"
+  and `pexpert/pexpert/arm64/NABU.h` documents SM7150/Kryo 470, while
+  `tools/mkadt.py` `--nabu` emits Apple identity + `qcom,sm8150` + `kryo485`
+  (SM8150, Pad 5). The tree is a fork of a sweet (SM7150) project renamed to
+  nabu, then adapted; the two SoC identities coexist. Do not "fix" one without
+  confirming which device is booted - the user reports the device this tree
+  targets reaches the lock screen.
+
 ## 2026-10-21 - iPadOS 16 UI + NT36523 probe
 
 - **Display/UI:** 1600x2560 panel; fallback presents backboardd's 1668x2224
@@ -61,7 +82,7 @@ What it took today (in order): 0058 HID services (Apple IOHIDFamily-1915 user cl
 
 **Build a phone image** (kernel K, ADT A): `python3 tools/mkpayload.py $K $A shim/out/payload-X.bin --cmdline "$B" && (cd shim && ./build.sh ../shim/out/payload-X.bin && cp out/shim-boot.img out/shim-boot-X.img)` then check `python3 tools/unpack_bootv2.py shim/out/shim-boot-X.img shim/out/check-X && cmp shim/out/check-X/ramdisk shim/out/payload-X.bin`. QEMU smoke test: `python3 tools/mkpayload.py $K research/q0057-hi.adt $S/csq/payloadX.bin --ramdisk $S/csq/root-fork.img --cmdline "debug=0xc serial=3 cpus=1 keepsyms=1 -enable_kprintf_spam -noprogress rd=md0"` + `PATH=~/swift/usr/bin:$PATH python3 tools/qemu-nabu.py ... --secs 40 --kernel $K --fail-on-panic` (S = scratchpad; root-fork.img lives in the session scratchpad csq/ dir and may be gone in a new session).
 
-**Kernel workflow:** edit `research/bt28/xnu/...` (keep the pre-edit copy in `research/preNNNN/`), syntax check `python3 tools/xnu-cc.py research/run28.log research/bt28 <file>`, make `xnu/patches/NNNN-*.patch` with `diff -u pre bt28 | sed` path rewrite, add new/changed files to `research/check-patch-order.py` list, run it (must say applied + MATCH), commit + push -> GitHub Actions `xnu` builds (~8 min) -> `gh run download <id> -R dipa-studio/ios-nabu -n xnu-kernel -D xnu/out-NNNN`. **Repo is PUBLIC since 2026-10-17** (private macOS runner minutes ran out: "recent account payments have failed"); public = free runners. Commit trailer: only `Co-Authored-By: dipa-studio <183933817+dipa-studio@users.noreply.github.com>`.
+**Kernel workflow:** edit `research/bt28/xnu/...` (keep the pre-edit copy in `research/preNNNN/`), syntax check `python3 tools/xnu-cc.py research/run28.log research/bt28 <file>`, make `xnu/patches/NNNN-*.patch` with `diff -u pre bt28 | sed` path rewrite, add new/changed files to `research/check-patch-order.py` list, run it (must say applied + MATCH), commit + push -> GitHub Actions `xnu` builds (~8 min) -> `gh run download <id> -R glebenekt/ios-nabu -n xnu-kernel -D xnu/out-NNNN`. **CI now runs on `glebenekt/ios-nabu` (public, see the 2026-10-22 note at the top); the older `dipa-studio/ios-nabu` references below are historical and dead.** Public = free runners. Commit trailer: only `Co-Authored-By: dipa-studio <183933817+dipa-studio@users.noreply.github.com>`.
 
 **Phone workflow (user does buttons, Claude runs commands):**
 - Boot test kernel: phone in fastboot -> `fastboot boot shim/out/shim-boot-X.img`. NEVER `fastboot getvar`.
